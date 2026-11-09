@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ときめきスキンシップ・シミュレーション</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color-normal: #e0f2fe; /* 爽やかな空色 */
+            --bg-color-tokimeki: #fce7f3; /* ときめきピンク */
+            --dialogue-bg: rgba(255, 255, 255, 0.85);
+            --primary-color: #ec4899;
+        }
+
+        body {
+            font-family: 'Zen Kaku Gothic New', sans-serif;
+            margin: 0;
+            overflow: hidden; /* スクロール禁止 */
+            background-color: var(--bg-color-normal);
+            transition: background-color 2s ease;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none; /* タッチデバイスでのデフォルトアクションを無効化 */
+        }
+
+        /* 桜のパーティクルアニメーション */
+        #sakura-container {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .sakura {
+            position: absolute;
+            background-color: #fbcfe8;
+            border-radius: 15px 0 15px 0;
+            opacity: 0.8;
+            animation: fall linear infinite;
+        }
+
+        @keyframes fall {
+            0% { transform: translateY(-50px) translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 0.8; }
+            100% { transform: translateY(100vh) translateX(50px) rotate(360deg); opacity: 0; }
+        }
+
+        /* ゲーム画面全体のコンテナ */
+        #game-screen {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            align-items: center;
+        }
+
+        /* キャラクターコンテナ（呼吸アニメーション） */
+        #character-container {
+            position: absolute;
+            bottom: 25%; /* テキストボックスの上 */
+            width: 90vw;
+            max-width: 500px;
+            z-index: 10;
+            animation: breath 4s ease-in-out infinite alternate;
+            transform-origin: bottom center;
+        }
+
+        @keyframes breath {
+            0% { transform: scaleY(1) translateY(0); }
+            100% { transform: scaleY(1.02) translateY(-5px); }
+        }
+
+        /* スキンシップのヒットボックス（SVG要素に直接適用） */
+        .touchable {
+            cursor: pointer;
+            transition: filter 0.2s;
+        }
+        .touchable:hover {
+            filter: brightness(1.1);
+        }
+        .touchable:active {
+            filter: brightness(0.95);
+        }
+
+        /* セリフボックス */
+        #dialogue-container {
+            position: relative;
+            width: 95%;
+            max-width: 800px;
+            height: 25vh;
+            min-height: 150px;
+            background: var(--dialogue-bg);
+            border: 4px solid #fbcfe8;
+            border-radius: 16px;
+            margin-bottom: 20px;
+            padding: 20px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            backdrop-filter: blur(5px);
+            z-index: 20;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* 名前欄 */
+        #name-box {
+            position: absolute;
+            top: -20px;
+            left: 20px;
+            background: #ec4899;
+            color: white;
+            padding: 4px 20px;
+            border-radius: 99px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            box-shadow: 0 4px 6px rgba(236, 72, 153, 0.3);
+            border: 2px solid white;
+        }
+
+        /* テキストエリア */
+        #text-content {
+            font-size: 1.2rem;
+            color: #374151;
+            line-height: 1.6;
+            margin-top: 15px;
+            flex-grow: 1;
+        }
+
+        /* クリック待ちアイコン */
+        #next-icon {
+            align-self: flex-end;
+            color: #ec4899;
+            font-size: 1.5rem;
+            animation: bounce 1s infinite;
+            display: none;
+        }
+
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(5px); }
+        }
+
+        /* 好感度（ときめき）パネル */
+        #affection-panel {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.9);
+            padding: 10px 15px;
+            border-radius: 12px;
+            border: 2px solid #fbcfe8;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+            z-index: 30;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .heart-icon {
+            font-size: 1.5rem;
+            color: #d1d5db; /* 初期はグレー */
+            transition: color 0.3s, transform 0.3s;
+        }
+        .heart-icon.filled {
+            color: #ec4899;
+        }
+        .heart-icon.pumping {
+            animation: heartbeat 0.8s infinite;
+        }
+
+        @keyframes heartbeat {
+            0% { transform: scale(1); }
+            15% { transform: scale(1.3); }
+            30% { transform: scale(1); }
+            45% { transform: scale(1.3); }
+            60% { transform: scale(1); }
+        }
+
+        /* タッチエフェクト（パーティクル） */
+        .touch-particle {
+            position: absolute;
+            pointer-events: none;
+            font-size: 1.5rem;
+            animation: floatUp 1s ease-out forwards;
+            z-index: 40;
+        }
+
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(0.5); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+
+        /* SVGのパーツのトランジション */
+        .blush {
+            opacity: 0;
+            transition: opacity 0.5s ease;
+        }
+        .blush.active {
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 桜吹雪の背景 -->
+    <div id="sakura-container"></div>
+
+    <div id="game-screen">
+        
+        <!-- 好感度パネル -->
+        <div id="affection-panel">
+            <span class="text-sm font-bold text-gray-600">好感度</span>
+            <div class="flex gap-1" id="hearts">
+                <span class="heart-icon" id="heart-1">❤</span>
+                <span class="heart-icon" id="heart-2">❤</span>
+                <span class="heart-icon" id="heart-3">❤</span>
+                <span class="heart-icon" id="heart-4">❤</span>
+                <span class="heart-icon" id="heart-5">❤</span>
+            </div>
+        </div>
+
+        <!-- キャラクター（SVGアート） -->
+        <div id="character-container">
+            <!-- 触れる範囲をSVGで定義 -->
+            <svg viewBox="0 0 200 250" class="w-full h-auto drop-shadow-2xl" id="character-svg">
+                <!-- 体（触れる） -->
+                <g class="touchable" id="touch-body" onclick="handleTouch('body', event)">
+                    <!-- ジャケット -->
+                    <path d="M40 250 L40 180 Q100 160 160 180 L160 250 Z" fill="#1e3a8a" />
+                    <!-- シャツとネクタイ -->
+                    <path d="M70 170 Q100 180 130 170 L100 250 Z" fill="#ffffff" />
+                    <path d="M95 180 L105 180 L100 230 Z" fill="#dc2626" />
+                    <!-- 肩のライン -->
+                    <path d="M40 180 Q30 200 20 250 M160 180 Q170 200 180 250" fill="none" stroke="#172554" stroke-width="2"/>
+                </g>
+
+                <!-- 首 -->
+                <path d="M85 140 L115 140 L115 175 L85 175 Z" fill="#fcd34d" />
+                <path d="M85 140 Q100 150 115 140" fill="none" stroke="#d97706" stroke-width="1" opacity="0.3"/>
+
+                <!-- 顔（触れる） -->
+                <g class="touchable" id="touch-face" onclick="handleTouch('face', event)">
+                    <!-- 輪郭 -->
+                    <path d="M60 90 Q60 160 100 170 Q140 160 140 90 Z" fill="#fde68a" />
+                    
+                    <!-- 照れ（頬の赤み - 初期状態は透明） -->
+                    <g id="face-blush" class="blush">
+                        <ellipse cx="75" cy="130" rx="12" ry="6" fill="#f43f5e" filter="blur(2px)"/>
+                        <ellipse cx="125" cy="130" rx="12" ry="6" fill="#f43f5e" filter="blur(2px)"/>
+                    </g>
+
+                    <!-- 目（通常状態） -->
+                    <g id="eyes-normal">
+                        <!-- 左目 -->
+                        <path d="M70 110 Q80 105 85 110" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="78" cy="113" r="3" fill="#1e3a8a" />
+                        <!-- 右目 -->
+                        <path d="M115 110 Q120 105 130 110" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round"/>
+                        <circle cx="122" cy="113" r="3" fill="#1e3a8a" />
+                    </g>
+                    <!-- 目（照れ/閉じ状態 - 初期は非表示） -->
+                    <g id="eyes-closed" style="display: none;">
+                        <path d="M68 112 Q78 115 85 112" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round"/>
+                        <path d="M115 112 Q122 115 132 112" fill="none" stroke="#374151" stroke-width="2" stroke-linecap="round"/>
+                    </g>
+                    <!-- 目（驚き - 初期は非表示） -->
+                    <g id="eyes-surprised" style="display: none;">
+                        <circle cx="78" cy="110" r="5" fill="none" stroke="#374151" stroke-width="2"/>
+                        <circle cx="78" cy="110" r="2" fill="#1e3a8a" />
+                        <circle cx="122" cy="110" r="5" fill="none" stroke="#374151" stroke-width="2"/>
+                        <circle cx="122" cy="110" r="2" fill="#1e3a8a" />
+                    </g>
+
+                    <!-- 鼻 -->
+                    <path d="M100 120 L98 130 L100 132" fill="none" stroke="#d97706" stroke-width="1.5" stroke-linecap="round" opacity="0.5"/>
+
+                    <!-- 口（通常） -->
+                    <path id="mouth-normal" d="M92 145 Q100 148 108 145" fill="none" stroke="#9f1239" stroke-width="1.5" stroke-linecap="round"/>
+                    <!-- 口（驚き/照れ） -->
+                    <circle id="mouth-open" cx="100" cy="147" r="3" fill="#9f1239" style="display: none;"/>
+                    <!-- 口（笑顔） -->
+                    <path id="mouth-smile" d="M90 145 Q100 155 110 145" fill="none" stroke="#9f1239" stroke-width="1.5" stroke-linecap="round" style="display: none;"/>
+                </g>
+
+                <!-- 髪（頭 - 触れる） -->
+                <g class="touchable" id="touch-head" onclick="handleTouch('head', event)">
+                    <!-- 後ろ髪 -->
+                    <path d="M50 90 Q50 40 100 40 Q150 40 150 90 Q160 130 150 150 Q160 100 130 60 Q100 30 70 60 Q40 100 50 150 Q40 130 50 90 Z" fill="#9ca3af" />
+                    <!-- 前髪 -->
+                    <path d="M60 90 L75 105 L85 85 L100 110 L115 85 L125 105 L140 90 Q150 60 100 50 Q50 60 60 90 Z" fill="#d1d5db" stroke="#9ca3af" stroke-width="1"/>
+                    <!-- アホ毛 -->
+                    <path d="M100 50 Q110 20 120 30 Q110 40 105 50" fill="#d1d5db" />
+                </g>
+            </svg>
+        </div>
+
+        <!-- セリフボックス -->
+        <div id="dialogue-container" onclick="advanceDialogue()">
+            <div id="name-box">蒼星 涼（そうせい りょう）</div>
+            <div id="text-content"></div>
+            <div id="next-icon">▼</div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- 設定と状態管理 ---
+        let affection = 0;           // 好感度 (0 - 100)
+        let isTyping = false;        // テキスト表示中フラグ
+        let currentText = "";        // 現在表示中のテキスト全体
+        let typeSpeed = 50;          // 文字表示スピード(ms)
+        let dialogueTimeout;
+        
+        // 状態ごとの閾値
+        const LEVEL_FRIENDLY = 30;
+        const LEVEL_TOKIMEKI = 70;
+
+        // UI要素
+        const textContent = document.getElementById('text-content');
+        const nextIcon = document.getElementById('next-icon');
+        const bodyElem = document.body;
+
+        // SVGパーツ
+        const eyesNormal = document.getElementById('eyes-normal');
+        const eyesClosed = document.getElementById('eyes-closed');
+        const eyesSurprised = document.getElementById('eyes-surprised');
+        const mouthNormal = document.getElementById('mouth-normal');
+        const mouthOpen = document.getElementById('mouth-open');
+        const mouthSmile = document.getElementById('mouth-smile');
+        const faceBlush = document.getElementById('face-blush');
+
+        // --- シナリオデータ（スキンシップ時のリアクション） ---
+        const reactions = {
+            // 初期状態（好感度0〜29）
+            normal: {
+                head: [
+                    { text: "おい、子供扱いするなよ。", exp: "normal" },
+                    { text: "…髪、崩れるだろ。やめろ。", exp: "normal" },
+                    { text: "なんだよ、急に。", exp: "normal" }
+                ],
+                face: [
+                    { text: "近いっ…！", exp: "surprised" },
+                    { text: "…あんまジロジロ見んな。", exp: "closed" },
+                    { text: "な、なんだよ。顔に何か付いてるか？", exp: "surprised" }
+                ],
+                body: [
+                    { text: "おい、どこ触ってんだ。", exp: "surprised" },
+                    { text: "…っ！？ びっくりさせんな。", exp: "surprised" },
+                    { text: "お前なぁ…少しは警戒心持てよ。", exp: "closed" }
+                ]
+            },
+            // 友好状態（好感度30〜69）
+            friendly: {
+                head: [
+                    { text: "…しょうがないな、今日だけだぞ。", exp: "smile" },
+                    { text: "お前って、ほんとマイペースだよな。", exp: "smile" },
+                    { text: "…ん。まぁ、悪くないけど。", exp: "closed" }
+                ],
+                face: [
+                    { text: "っ…！ あんま見られると、照れるだろ。", exp: "blush" },
+                    { text: "…お前、無防備すぎ。勘違いするぞ。", exp: "blush" },
+                    { text: "なんだ？ …俺の顔、そんなに珍しいか？", exp: "blush" }
+                ],
+                body: [
+                    { text: "…っ、おい。くすぐったい。", exp: "closed" },
+                    { text: "お前…ほんと距離感おかしいぞ。", exp: "blush" },
+                    { text: "…あんまりベタベタすんな。…嫌じゃないけど。", exp: "blush" }
+                ]
+            },
+            // ときめき状態（好感度70〜100）
+            tokimeki: {
+                head: [
+                    { text: "…もっと撫でていいぞ。お前の手、落ち着く。", exp: "smile" },
+                    { text: "ふふっ、お前になら、どうされてもいいや。", exp: "smile" },
+                    { text: "…ずっと、こうしていたいな。", exp: "smile" }
+                ],
+                face: [
+                    { text: "…お前が可愛すぎて、どうにかなりそうだ。", exp: "blush" },
+                    { text: "そんな目で見ないでくれ。…我慢できなくなる。", exp: "blush" },
+                    { text: "…好きだ。お前の全部が愛おしい。", exp: "blush" }
+                ],
+                body: [
+                    { text: "…っ。お前から触れてくれるなんて、嬉しい。", exp: "blush" },
+                    { text: "…今度は俺から、抱きしめていいか？", exp: "blush" },
+                    { text: "お前からのスキンシップ…反則だろ。", exp: "blush" }
+                ]
+            }
+        };
+
+        // --- 初期処理 ---
+        window.onload = () => {
+            createSakura();
+            showText("こんにちは。キャラクターの『頭』『顔』『体』をタッチ（クリック）して、スキンシップをとってみましょう。");
+        };
+
+        // --- スキンシップ（タッチ）イベント ---
+        function handleTouch(part, event) {
+            event.stopPropagation(); // イベントのバブリングを防ぐ（背景クリックと被らないように）
+            
+            if (isTyping) return; // セリフ表示中は無視
+
+            // タッチエフェクト（パーティクル）の生成
+            createTouchEffect(event.clientX, event.clientY);
+
+            // 状態の判定
+            let state = 'normal';
+            if (affection >= LEVEL_TOKIMEKI) {
+                state = 'tokimeki';
+            } else if (affection >= LEVEL_FRIENDLY) {
+                state = 'friendly';
+            }
+
+            // ランダムにリアクションを選択
+            const responses = reactions[state][part];
+            const response = responses[Math.floor(Math.random() * responses.length)];
+
+            // 表情の変更
+            changeExpression(response.exp);
+
+            // セリフの表示
+            showText(response.text);
+
+            // 好感度の上昇とUI更新
+            addAffection(part, state);
+        }
+
+        // --- 表情の変更 ---
+        function changeExpression(type) {
+            // 一旦すべてリセット
+            eyesNormal.style.display = 'none';
+            eyesClosed.style.display = 'none';
+            eyesSurprised.style.display = 'none';
+            mouthNormal.style.display = 'none';
+            mouthOpen.style.display = 'none';
+            mouthSmile.style.display = 'none';
+            faceBlush.classList.remove('active');
+
+            switch(type) {
+                case 'normal':
+                    eyesNormal.style.display = 'block';
+                    mouthNormal.style.display = 'block';
+                    break;
+                case 'surprised':
+                    eyesSurprised.style.display = 'block';
+                    mouthOpen.style.display = 'block';
+                    break;
+                case 'closed':
+                    eyesClosed.style.display = 'block';
+                    mouthNormal.style.display = 'block';
+                    break;
+                case 'smile':
+                    eyesClosed.style.display = 'block';
+                    mouthSmile.style.display = 'block';
+                    break;
+                case 'blush':
+                    eyesSurprised.style.display = 'block';
+                    mouthOpen.style.display = 'block';
+                    faceBlush.classList.add('active');
+                    break;
+            }
+
+            // ときめき状態なら常に少し頬を染める
+            if (affection >= LEVEL_TOKIMEKI) {
+                faceBlush.classList.add('active');
+            }
+        }
+
+        // --- 好感度システム ---
+        function addAffection(part, state) {
+            // 上昇量の計算（部位や状態によって変えても面白いですが、今回はシンプルに）
+            let increase = 5 + Math.floor(Math.random() * 5); // 5〜9の上昇
+            
+            // ときめき状態なら上がりやすくするボーナス
+            if(state === 'friendly') increase += 2;
+
+            affection = Math.min(100, affection + increase);
+            updateHearts();
+
+            // 背景の変化
+            if (affection >= LEVEL_TOKIMEKI) {
+                document.body.style.backgroundColor = 'var(--bg-color-tokimeki)';
+            }
+        }
+
+        function updateHearts() {
+            // ハートアイコンの更新（20ごとに1つ満タン）
+            for (let i = 1; i <= 5; i++) {
+                const heart = document.getElementById(`heart-${i}`);
+                if (affection >= i * 20) {
+                    heart.classList.add('filled');
+                    if (affection >= LEVEL_TOKIMEKI) {
+                        heart.classList.add('pumping');
+                    }
+                }
+            }
+        }
+
+        // --- テキスト表示（タイプライター風） ---
+        function showText(text) {
+            clearTimeout(dialogueTimeout);
+            currentText = text;
+            textContent.innerHTML = '';
+            nextIcon.style.display = 'none';
+            isTyping = true;
+            
+            let i = 0;
+            function typeWriter() {
+                if (i < text.length) {
+                    textContent.innerHTML += text.charAt(i);
+                    i++;
+                    dialogueTimeout = setTimeout(typeWriter, typeSpeed);
+                } else {
+                    isTyping = false;
+                    nextIcon.style.display = 'block';
+                    // セリフ表示完了後、数秒で表情を元に戻す（ときめき状態以外）
+                    if (affection < LEVEL_TOKIMEKI) {
+                        setTimeout(() => changeExpression('normal'), 2000);
+                    } else {
+                         // ときめき状態なら微笑みに戻す
+                         setTimeout(() => changeExpression('smile'), 2000);
+                    }
+                }
+            }
+            typeWriter();
+        }
+
+        // テキスト枠クリックで全文字即時表示
+        function advanceDialogue() {
+            if (isTyping) {
+                clearTimeout(dialogueTimeout);
+                textContent.innerHTML = currentText;
+                isTyping = false;
+                nextIcon.style.display = 'block';
+            }
+        }
+
+        // --- エフェクト関連 ---
+        // タッチ時のパーティクル（ハートやキラキラ）生成
+        function createTouchEffect(x, y) {
+            const symbols = ['💖', '✨', '🎵'];
+            const symbol = affection >= LEVEL_TOKIMEKI ? '💖' : (affection >= LEVEL_FRIENDLY ? '✨' : '🎵');
+            
+            const particle = document.createElement('div');
+            particle.className = 'touch-particle';
+            particle.innerText = symbol;
+            
+            // クリック位置から少し上に配置
+            particle.style.left = `${x - 15}px`;
+            particle.style.top = `${y - 30}px`;
+            
+            document.body.appendChild(particle);
+            
+            // アニメーション終了後に削除
+            setTimeout(() => {
+                particle.remove();
+            }, 1000);
+        }
+
+        // 桜の降る背景アニメーション
+        function createSakura() {
+            const container = document.getElementById('sakura-container');
+            const sakuraCount = 20; // 花びらの数
+
+            for (let i = 0; i < sakuraCount; i++) {
+                createSingleSakura(container);
+            }
+        }
+
+        function createSingleSakura(container) {
+            const sakura = document.createElement('div');
+            sakura.className = 'sakura';
+            
+            // ランダムな位置、サイズ、アニメーション時間
+            const size = Math.random() * 10 + 5;
+            const left = Math.random() * 100;
+            const duration = Math.random() * 5 + 5;
+            const delay = Math.random() * 10;
+
+            sakura.style.width = `${size}px`;
+            sakura.style.height = `${size}px`;
+            sakura.style.left = `${left}vw`;
+            sakura.style.animationDuration = `${duration}s`;
+            sakura.style.animationDelay = `${delay}s`;
+
+            container.appendChild(sakura);
+        }
+    </script>
+</body>
+</html>
