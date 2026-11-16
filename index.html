@@ -315,6 +315,7 @@
         let currentText = "";        // 現在表示中のテキスト全体
         let typeSpeed = 50;          // 文字表示スピード(ms)
         let dialogueTimeout;
+        let expressionTimeout;
         
         // 状態ごとの閾値
         const LEVEL_FRIENDLY = 30;
@@ -503,6 +504,7 @@
         // --- テキスト表示（タイプライター風） ---
         function showText(text) {
             clearTimeout(dialogueTimeout);
+            clearTimeout(expressionTimeout);
             currentText = text;
             textContent.innerHTML = '';
             nextIcon.style.display = 'none';
@@ -515,18 +517,19 @@
                     i++;
                     dialogueTimeout = setTimeout(typeWriter, typeSpeed);
                 } else {
-                    isTyping = false;
-                    nextIcon.style.display = 'block';
-                    // セリフ表示完了後、数秒で表情を元に戻す（ときめき状態以外）
-                    if (affection < LEVEL_TOKIMEKI) {
-                        setTimeout(() => changeExpression('normal'), 2000);
-                    } else {
-                         // ときめき状態なら微笑みに戻す
-                         setTimeout(() => changeExpression('smile'), 2000);
-                    }
+                    finishDialogue();
                 }
             }
             typeWriter();
+        }
+
+        function finishDialogue() {
+            isTyping = false;
+            nextIcon.style.display = 'block';
+            clearTimeout(expressionTimeout);
+            expressionTimeout = setTimeout(() => {
+                changeExpression(affection < LEVEL_TOKIMEKI ? 'normal' : 'smile');
+            }, 2000);
         }
 
         // テキスト枠クリックで全文字即時表示
@@ -534,8 +537,7 @@
             if (isTyping) {
                 clearTimeout(dialogueTimeout);
                 textContent.innerHTML = currentText;
-                isTyping = false;
-                nextIcon.style.display = 'block';
+                finishDialogue();
             }
         }
 
